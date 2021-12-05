@@ -1,2 +1,2 @@
-# travelling_thief_theta
+# Travelling Salesman Problem
 Travelling thief problem 
