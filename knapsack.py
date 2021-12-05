@@ -10,11 +10,12 @@ from numpy.random import choice
 
 class KnapsackGA:
     
-    def __init__(self, cities, max_item, v_min,bag_max_weight):
+    def __init__(self, cities, max_item, v_min,bag_max_weight, dist_mat):
         self.n_cities = cities
         self.max_item = max_item
         self.v_min = v_min
         self.bag_max_weight = bag_max_weight
+        self.dist_mat = dist_mat
     
 
     def ks_distance_matrix(self):
@@ -57,13 +58,15 @@ class KnapsackGA:
         if(scores[rnd_var1] > scores[rnd_var2]): index = rnd_var1
         elif(scores[rnd_var1] == scores[rnd_var2]): index = choice([rnd_var1, rnd_var2])
         else: index = rnd_var2
-        return pop[index]
+        return pop[index], index
     
     def ks_crossover(self, prnt1, prnt2, perform):
         child1, child2 = prnt1.copy(), prnt2.copy()
         if perform == 1:
+            # Selecting random point from the length of the parent
             pt = np.random.randint(1, len(prnt1)-1)
             print(f"Index for crossover: {pt}")
+            # crossover performed from the point selected between the two parents
             child1 = np.concatenate([prnt1[:pt], prnt2[pt:]])
             child2 = np.concatenate([prnt2[:pt], prnt1[pt:]])
         # print(f"Child1: {child1}, Child2: {child2}")
@@ -74,11 +77,37 @@ class KnapsackGA:
         if perform_mutation == 1:
             for i in range(k):
                 n = np.random.randint(len(chromo))
-                print(f"ks_mutate chromo value: {chromo[n] at index {n}}")
+                print(f"ks_mutate chromo value: {chromo[n]} at index {n}")
                 if chromo[n] == 1: chromo[n] = 0
                 else: chromo[n] = 0
             
         return chromo;
+    
+    def ks_weakest_replacement(self, pop, scores, mutation, route, items_per_city, value, wt):
+        print(f"ks_weakest_replacement Complete population:\n {pop}")
+        print(f"Fitness Scores: {scores}")
+        print(f"Mutation that  replaces: {mutation}")
+        print(f"Route replacement: {route}")
+        mut_val = self.ks_value_fitness(mutation, items_per_city, value)
+        mut_time = self.ks_time_fitness(mutation, route, items_per_city, wt)
+        print(f"Value of mut: {mut_val}")
+        print(f"Total time of mut: {mut_time}")
+        mut_val_time_fit = round(mut_val / mut_time,2)
+        print(f"Mutation val-time score: {mut_val_time_fit}")
+        min_fit = min(scores)
+        if mut_val_time_fit > min_fit:
+            min_fit_idx_lst = []
+            for i in range(len(scores)):
+                if scores[i] == min_fit : min_fit_idx_lst.append(i)
+            print("min_fit_idx_lst: ",min_fit_idx_lst)
+            # rndm_idx = choice(min_fit_idx_lst)
+            idx = np.random.choice(min_fit_idx_lst)
+            print(f"Chromosome to be replaced: {pop[idx]}, Route index: {idx}")
+            pop[idx] = mutation
+            scores[idx] = mut_val_time_fit
+        return pop, scores
+
+        
     
         #Calculating the weight of the bag at each city
     def ks_bag_weight(self, chromo, no_of_items,weight_list, city_index):
@@ -105,10 +134,10 @@ class KnapsackGA:
         return value
    
     
-    def ks_value_fitness(self, chromo, items_per_city, value, cities):
+    def ks_value_fitness(self, chromo, items_per_city, value):
         # Calculating fitness for a chromosome based on value
         value_per_chromo = 0;
-        for idx in range(cities):
+        for idx in range(self.n_cities):
             value_city = self.ks_bag_value(chromo, items_per_city, value,  idx)
             print("Value per city: ", value_city)
             value_per_chromo += value_city;
@@ -138,30 +167,29 @@ class KnapsackGA:
             
         return time
     
-    def ks_time_fitness(self, chromo, dist_mat, route, item_per_city, chromo_weight):
+    def ks_time_fitness(self, chromo, route, item_per_city, chromo_weight):
         time_per_chromo = 0
         print("route len: ",len(route))
         for idx in range(len(route)):
             # Calculate time per city by iterating through each city index
-            time_per_city = self.ks_intercity_time(chromo, dist_mat,
+            time_per_city = self.ks_intercity_time(chromo, self.dist_mat,
                                                    route,items_per_city, chromo_weight, idx)
             print(f"city covered {idx} time_per_city: {time_per_city} ")
             time_per_chromo += time_per_city
         return time_per_chromo
     
     
-    def ks_val_time_fitness(self, population, item_per_city, complete_values, cities, dist_mat, total_route, complete_weights ):
+    def ks_val_time_fitness(self, population, item_per_city, complete_values, total_route, complete_weights):
         tot_val_time = []
         for i in range(route_len):
             print("i ",i)
-            total_val = kga.ks_value_fitness(population[i],items_per_city, complete_values[i], cities)
+            total_val = kga.ks_value_fitness(population[i],items_per_city, complete_values[i])
             print("Total value for a city: ",total_val)
             print("------------------------")
-            time_route = kga.ks_time_fitness(population[i], dist_mat, total_route[i], items_per_city, complete_weights[i])
+            time_route = kga.ks_time_fitness(population[i], total_route[i], items_per_city, complete_weights[i])
             print("Total time for a route: ", time_route)
             print("------------------------")
-            val_time = total_val / time_route 
-            val_time = round(val_time,2)
+            val_time = round(total_val / time_route, 2)
             print("Val and time fitness for 1 single route: ", val_time)
             tot_val_time.append(val_time)
             
@@ -171,15 +199,16 @@ class KnapsackGA:
         
 
 cities = 4; max_items = 5; max_wt = 20; max_val = 20; v_min =1; v_max=20; k = 4 # mutation based on no of cities
-route = [2,1,3,4]; bag_max_weight = 20; total_route = [[2,1,3,4], [1,3,2,4]]; perform_crossover = 1;perform_mutation=1
+route = [2,1,3,4]; bag_max_weight = 20; total_route = [[2,1,3,4], [1,3,2,4],[2,3,4,1], [4,3,2,1]]; 
+perform_crossover = 1;perform_mutation=1; distance_matrix =  [[0, 5, 1, 2], [5, 0, 1, 2],[1, 2, 0, 9],[1, 2, 9, 0]]
 
 route_len = len(total_route)
-kga = KnapsackGA(cities, max_items, v_min, bag_max_weight)
-dist_mat = kga.ks_distance_matrix()
+kga = KnapsackGA(cities, max_items, v_min, bag_max_weight, distance_matrix)
+# dist_mat = kga.ks_distance_matrix()
 items_per_city, population, complete_weights, complete_values = kga.ks_population(route_len, max_wt, max_val)
 
 print("Cities Covered: ",route)
-print(f"Distance Matrix:\n {dist_mat}")
+print(f"Distance Matrix:\n {distance_matrix}")
 print("------------------------")
 print(f"Items per city:\n {items_per_city}")
 print("------------------------")
@@ -190,11 +219,13 @@ print("------------------------")
 print(f"Values:\n {complete_values}")
 print("------------------------")
 
-# Generating random fitness for now
-# fit_score = [10,20,30,40]
+
 
 
 #######################################################################################################
+# Generating random fitness for now
+# fit_score = [10,20,30,40]
+
 # weight = kga.ks_bag_weight(population[0], items_per_city, complete_weights[0], city_index=2)
 # print("weight",weight)
 
@@ -215,17 +246,24 @@ print("------------------------")
 #######################################################################################################
 
 
-val_time_fit = kga.ks_val_time_fitness(population, items_per_city, complete_values, cities, dist_mat, total_route, complete_weights)
+val_time_fit = kga.ks_val_time_fitness(population, items_per_city, complete_values, total_route, complete_weights)
 print("Val-Time fitness for all routes: ",val_time_fit)
 
 
-parent_1 = kga.ks_tournament_selection(population, val_time_fit)
-parent_2 = kga.ks_tournament_selection(population, val_time_fit)
-print(f"Parent 1: {parent_1}")
-print(f"Parent 2: {parent_2}")
+parent_1, route1 = kga.ks_tournament_selection(population, val_time_fit)
+parent_2, route2 = kga.ks_tournament_selection(population, val_time_fit)
+print(f"Parent 1: {parent_1}, Route Selected: {route1}")
+print(f"Parent 2: {parent_2},  Route Selected: {route2}")
 
 ch1, ch2 = kga.ks_crossover(parent_1, parent_1, perform_crossover)
 print(f"Child1: {ch1}, Child2: {ch2}")
 mut1 = kga.ks_mutate(ch1, k, perform_mutation)
 mut2 = kga.ks_mutate(ch2, k, perform_mutation)
 print(f"Mutation1: {mut1}, Mutation2: {mut2}")
+print("------------------------")
+pop, scores = kga.ks_weakest_replacement(population, val_time_fit, mut1, total_route[route1], items_per_city,
+                           complete_values[route1], complete_weights[route1])
+print(f"Population after replacement1:\n {pop}\n Mutated Val-Time scores1:{scores}")
+pop, scores = kga.ks_weakest_replacement(population, val_time_fit, mut2, total_route[route2], items_per_city,
+                           complete_values[route2], complete_weights[route2])
+print(f"Population after replacement2:\n {pop}\n Mutated Val-Time scores2:{scores}")
