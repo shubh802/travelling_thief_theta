@@ -4,6 +4,7 @@ Spyder Editor
 
 This is a Knapsack via EA file.
 """
+import os
 import numpy as np
 import pandas as pd
 from numpy.random import choice
@@ -61,10 +62,7 @@ class KnapsackGA:
 
         print("route: ",route)
         mut_val_time_fit = self.ks_fitness(mutation, items_per_city, value, route, wt)
-        
         print(f"Mutation val-time score: {mut_val_time_fit}")
-        print(f"ks_weakest_replacement fitness scores: ",scores)
-        
         min_fit = min(scores)
         if mut_val_time_fit > min_fit:
             min_fit_idx_lst = []
@@ -76,30 +74,32 @@ class KnapsackGA:
             scores[idx] = mut_val_time_fit
         return pop, scores
     
-    def ks_plot(self, value, time, colormap, marker):
+    def ks_plot(self, value, time, colormap, marker, label):
         
         for i in range(len(value)):
-            plt.scatter(time[i], value[i],color=colormap, alpha=.50, zorder=2, marker=marker)
+            plt.scatter(time[i], value[i],color=colormap, alpha=.50, zorder=2, marker=marker, label=label)
         plt.xlabel("Time")
         plt.ylabel("Total values per chromosome")
+        plt.savefig('value_time.png')
 
         
-        #Calculating the weight of the bag at each city
+
     def ks_bag_weight(self, chromo, no_of_items,weight_list, city_index):
+        #Calculating the weight of the bag at each city
         items_considered = sum(no_of_items[:city_index+1])
         weights_considered = weight_list[:items_considered]
         chromosome_considered = chromo[:items_considered]  
         weight = np.dot(weights_considered, chromosome_considered)
-        
         return weight
     
     
     def ks_chromo_value(self, value, chromo):
         return np.dot(value, chromo)
 
-    
-        #calculating time taken to travel between cities
+
     def ks_intercity_time(self, chromo, distance_matrix, route, items_per_city, chromo_weight, city_index):
+        #calculating time taken to travel between cities
+        
         # print("ks_intercity_time route: ", route)
         # print("city_index : ", city_index)
         
@@ -108,7 +108,6 @@ class KnapsackGA:
         # Reducing 1 from city to match distance matrix (0,1,2,3) 
         distance = distance_matrix[city1-1][city2-1]
         weight = self.ks_bag_weight(chromo,items_per_city,chromo_weight, city_index)
-        # print("Incremental bag weight: ",weight)      
         if weight > self.bag_max_weight:
             velocity = self.v_min
         else:
@@ -135,15 +134,28 @@ class KnapsackGA:
         val_time = values_per_chromo / time_route
         return round(val_time,2)
     
+    def ks_save_route_data(self, filename, list1, list2):
+        file_path = os.path.join(os.getcwd(), filename)
+        with open(file_path,'w+') as file:
+            for item1, item2 in zip(list1, list2): 
+                file.write(" ".join(map(str,item1))+'\n')
+                file.write(" ".join(map(str, item2))+'\n\n')
+                
+    def ks_save_value_data(self, filename, value1, value2):
+        file_path = os.path.join(os.getcwd(), filename)
+        with open(file_path,'w+') as file:
+            for item1, item2 in zip(value1, value2): 
+                file.write(str(item1)+' '+ str(item2)+'\n')
     
-    def ks_algorithm(self, population, items_per_city, value, route, weights, 
+    
+    def ks_algorithm(self, population, items_per_city, value, route, weights, k, 
                      perform_crossover, perform_mutation, term_criteria, no_of_chromo):
         
         # Running knapsack algo for each route, 
-        tot_route_val , tot_route_time = [],[]
-        while(term_criteria < 5):
+        # tot_route_val , tot_route_time = [],[]
+        while(term_criteria > 0):
             # Each route is being run in 5 iterations
-            term_criteria +=1 ;
+            term_criteria -=1 ;
             val_time_fit = [self.ks_fitness(population[i], items_per_city, value, route, weights) 
                                     for i in range(no_of_chromo)]
             print("Val-Time fitness for all chromosome: ",val_time_fit)
@@ -167,54 +179,35 @@ class KnapsackGA:
             # Best chromosome fitness is selected per iterations
             max_chromo_fitness = max(val_time_fit)
             max_chromo_idx = val_time_fit.index(max_chromo_fitness)
-            print(f"max_chromo_fitness: {max_chromo_fitness}, index: {max_chromo_idx}")
             best_chromo = population[max_chromo_idx]
-            
-            # # Max best value is calculated per iterations
-            # max_best_val = self.ks_chromo_value(population[max_chromo_idx], value)
-            # max_best_time = self.ks_time_fitness(population[max_chromo_idx], route, items_per_city, weights)
-            
-            # print(f"Best Chromosome Total Val: {max_best_val} Best Chromosome Total Time: {max_best_time}")
-
-            # tot_route_val.append(max_best_val)
-            # tot_route_time.append(max_best_time)
-            
+            print(f"max_chromo_fitness: {max_chromo_fitness}, index: {max_chromo_idx}")
             
             final_val = [ self.ks_chromo_value(population[i],value) for i in range(no_of_chromo)] 
             final_time = [self.ks_time_fitness(population[i], route, items_per_city,
                                                   weights) for i in range(no_of_chromo) ]
             
             print(f" Final Value: {final_val}, Final time: {final_time}")
+           
+        best_route_value = self.ks_chromo_value(population[max_chromo_idx], value)
+        best_route_time = self.ks_time_fitness(population[max_chromo_idx], route, items_per_city, weights)
             
+        return final_val, final_time, best_chromo, best_route_value, best_route_time
             
-        return final_val, final_time, best_chromo   
-            
-        # return tot_route_val, tot_route_time, best_chromo
-    
 
-    
-    
-        
 
-max_items = 5; max_wt = 20; max_val = 20; v_min =1; v_max=20; k = 2 # mutation based on no of cities
+max_items = 5; max_wt = 20; max_val = 20; v_min =1; v_max=20; k = 5 # mutation based on no of cities
 bag_max_weight = 20;  route = [2,1,3,4]; no_of_chromo = 5
 perform_crossover = 1; perform_mutation=1; 
-# distance_matrix =  [[0, 5, 1, 2], [5, 0, 1, 2],[1, 2, 0, 9],[1, 2, 9, 0]]
 distance_matrix = [[0., 9., 2., 1., 7.],
 [9., 0., 3., 8., 6.],
 [2., 1., 0., 1., 4.],
 [7., 3., 8., 0., 4.],
 [6., 1., 4., 4., 0.]]
-term_criteria = 0; colormap = ['b','g','c','m','#7BC8F6']; marker= ['^','<','o','v','>']
-# total_route = [[2,1,3,4], [1,3,2,4],[2,3,4,1], [4,3,2,1]];
+term_criteria = 5; colormap = ['b','g','c','m','#7BC8F6']; marker= ['^','<','o','v','>']
 total_route= [[4, 3, 1, 2, 0], [4, 1, 2, 0, 3], [4, 1, 0, 2, 3], [4, 1, 2, 3, 0]]
 cities = len(total_route[0])
-print("cities: ", cities)
-
-
 
 np.random.seed(5)
-
 items_per_city = np.random.randint(1, max_items, size= cities)
 total_items = sum(items_per_city)
 # Calculating weight for each item in the route, Weight of the item cannot be 0
@@ -235,20 +228,27 @@ print(f" Weigths:\n {weights}")
 print("------------------------")
 print(f"Values:\n {value}")
 
-best_route_val, best_route_time, best_route_chromo = [],[],[]
+route_val_lst, route_time_lst, route_chromo_lst = [], [], []
 
 for idx, route in enumerate(total_route):
 
-    # tot_route_val, tot_route_time, best_chromo = kga.ks_algorithm(population, items_per_city, value, route, weights, 
-    #                                                               perform_crossover, perform_mutation, term_criteria, no_of_chromo)
+    label = 'Route'+str(idx+1)
+    tot_route_val,tot_route_time,best_chromo,best_route_value,best_route_time = kga.ks_algorithm(population, 
+                    items_per_city, value, route, weights, k, perform_crossover, perform_mutation, term_criteria, no_of_chromo)
+    print(f"best_route_value {best_route_value},best_route_time {best_route_time}, best_chromo {best_chromo}")
+   
+    route_val_lst.append(best_route_value)
+    route_time_lst.append(best_route_time)
+    route_chromo_lst.append(best_chromo)
     
-    tot_route_val, tot_route_time, best_chromo = kga.ks_algorithm(population, items_per_city, value, route, weights, 
-                                                                  perform_crossover, perform_mutation, term_criteria, no_of_chromo)
-    kga.ks_plot(tot_route_val, tot_route_time, colormap[idx], marker[idx])  
+    kga.ks_plot(tot_route_val, tot_route_time, colormap[idx], marker[idx], label)  
     
-# label=['Route '+str(i+1) for i in range(len(total_route))]
+kga.ks_save_route_data('Theta_ttp.x', total_route,  route_chromo_lst)
+kga.ks_save_value_data('Theta_ttp.f', route_val_lst,  route_time_lst)
+
 plt.legend(bbox_to_anchor=(1.01, 1.0))
 plt.show()
+plt.close()
 
 
 
